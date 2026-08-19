@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leak Vision — Monitore antes que a falha aconteça</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+  :root{
+    --neon:#39ff14;
+    --neon-dim:#1aff6b33;
+    --neon-mid:#39ff1466;
+    --bg:#000000;
+    --surface:#0a0a0a;
+    --surface2:#111111;
+    --border:#1a1a1a;
+    --muted:#444444;
+    --font-display:'Exo 2', sans-serif;
+    --font-mono:'JetBrains Mono', monospace;
+    --font-body:'Inter', sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0;
+    background:#000;
+    color:#e8e8e8;
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  img,svg{ max-width:100%; }
+  .icon{ display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .icon svg{ display:block; }
+  ul{ list-style:none; margin:0; padding:0; }
+  a{ text-decoration:none; color:inherit; }
+  button{ font:inherit; border:none; background:none; }
+
+  ::-webkit-scrollbar{ width:4px; }
+  ::-webkit-scrollbar-track{ background:#000; }
+  ::-webkit-scrollbar-thumb{ background:var(--neon); border-radius:2px; }
+
+  /* ---------- animations ---------- */
+  @keyframes pulse-dot{
+    0%,100%{ opacity:1; box-shadow:0 0 8px var(--neon),0 0 16px var(--neon); }
+    50%{ opacity:.4; box-shadow:0 0 2px var(--neon); }
+  }
+  @keyframes glow-text{
+    0%,100%{ text-shadow:0 0 10px var(--neon),0 0 20px var(--neon); }
+    50%{ text-shadow:0 0 4px var(--neon); }
+  }
+  @keyframes waveform{
+    0%{ transform:scaleY(1); }
+    25%{ transform:scaleY(2.2); }
+    50%{ transform:scaleY(.6); }
+    75%{ transform:scaleY(1.8); }
+    100%{ transform:scaleY(1); }
+  }
+
+  .pulse-dot{ animation:pulse-dot 2s ease-in-out infinite; }
+  .glow-text{ animation:glow-text 3s ease-in-out infinite; }
+
+  .neon-border{
+    border:1px solid #39ff1444;
+    box-shadow:0 0 12px #39ff1411, inset 0 0 12px #39ff1408;
+  }
+  .neon-border-bright{
+    border:1px solid var(--neon);
+    box-shadow:0 0 20px #39ff1444, inset 0 0 20px #39ff1411;
+  }
+
+  .bar-animate{ animation:waveform 1.2s ease-in-out infinite; }
+  .bar-animate:nth-child(2){ animation-delay:.15s; }
+  .bar-animate:nth-child(3){ animation-delay:.3s; }
+  .bar-animate:nth-child(4){ animation-delay:.45s; }
+  .bar-animate:nth-child(5){ animation-delay:.6s; }
+  .bar-animate:nth-child(6){ animation-delay:.75s; }
+  .bar-animate:nth-child(7){ animation-delay:.9s; }
+  .bar-animate:nth-child(8){ animation-delay:1.05s; }
+
+  /* ---------- layout helpers ---------- */
+  .wrap{ max-width:1024px; margin:0 auto; padding-left:1.5rem; padding-right:1.5rem; }
+  section{ padding:6rem 1.5rem; }
+  @media(min-width:768px){ section{ padding-left:3rem; padding-right:3rem; } }
+  .section-alt{ background:#050505; }
+  .eyebrow{
+    font-family:var(--font-mono); font-size:.65rem; color:var(--neon);
+    letter-spacing:.4em; margin-bottom:1rem;
+  }
+  h2.title{
+    font-family:var(--font-display); font-weight:800;
+    font-size:clamp(2rem,5vw,3.5rem); color:#fff; line-height:1.1; margin:0 0 4rem;
+  }
+  h2.title.tight{ margin-bottom:1rem; }
+  .accent{ color:var(--neon); }
+
+  /* ---------- nav ---------- */
+  nav.topnav{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 1.5rem; height:4rem;
+    background:rgba(0,0,0,.88); backdrop-filter:blur(14px);
+    border-bottom:1px solid #39ff1420;
+  }
+  @media(min-width:768px){ nav.topnav{ padding:0 3rem; } }
+  .brand{
+    font-family:var(--font-display); font-weight:900; color:var(--neon);
+    letter-spacing:.18em; font-size:1.05rem;
+  }
+  .nav-links{ display:none; align-items:center; gap:2rem; }
+  @media(min-width:768px){ .nav-links{ display:flex; } }
+  .nav-links a{
+    font-family:var(--font-mono); font-size:.68rem; letter-spacing:.15em;
+    text-transform:uppercase; color:#999; transition:color .2s;
+  }
+  .nav-links a:hover{ color:#fff; }
+  .nav-toggle{ color:#fff; cursor:pointer; }
+  @media(min-width:768px){ .nav-toggle{ display:none; } }
+  .mobile-menu{
+    display:none; position:absolute; top:4rem; left:0; right:0;
+    flex-direction:column; gap:1rem; padding:1.5rem;
+    background:#000; border-bottom:1px solid #39ff1420;
+  }
+  .mobile-menu.open{ display:flex; }
+  .mobile-menu a{
+    font-family:var(--font-mono); font-size:.75rem; letter-spacing:.15em;
+    text-transform:uppercase; color:#999;
+  }
+
+  /* ---------- buttons ---------- */
+  .pill-btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    border-radius:9999px; font-family:var(--font-display); font-weight:800;
+    letter-spacing:.18em; font-size:.78rem; cursor:pointer;
+    transition:all .18s ease; user-select:none; padding:.8rem 2.2rem;
+    background:var(--neon); color:#000; border:2px solid var(--neon);
+    box-shadow:0 0 18px #39ff1455;
+  }
+  .pill-btn:hover{ background:#55ff3a; box-shadow:0 0 32px #39ff14aa,0 0 64px #39ff1444; transform:scale(1.04); }
+  .pill-btn:active{ background:#2dcc10; box-shadow:0 0 12px #39ff1466; transform:scale(.97); }
+  .pill-btn.outline{
+    background:transparent; color:var(--neon); border:2px solid var(--neon);
+    box-shadow:none;
+  }
+  .pill-btn.outline:hover{ background:#39ff1410; box-shadow:0 0 20px #39ff1444, inset 0 0 20px #39ff1408; }
+  .pill-btn.outline:active{ background:#39ff1415; }
+  .pill-btn.small{ padding:.45rem 1.4rem; font-size:.68rem; }
+  .pill-btn.full{ width:100%; }
+
+  /* ---------- icon badge ---------- */
+  .icon-badge{
+    width:56px; height:56px; border-radius:50%;
+    background:#39ff1415; border:1.5px solid #39ff1466;
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.4rem; transition:all .2s ease; cursor:default;
+  }
+  .icon-badge:hover{
+    background:#39ff1428; border-color:var(--neon);
+    box-shadow:0 0 22px #39ff1466, inset 0 0 12px #39ff1410;
+    transform:scale(1.12);
+  }
+  .icon-badge.lg{ width:60px; height:60px; font-size:1.5rem; }
+  .icon-badge.md{ width:52px; height:52px; font-size:1.3rem; }
+
+  /* ---------- hero ---------- */
+  .hero{
+    position:relative; min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:6rem 1.5rem 4rem;
+    overflow:hidden; text-align:center;
+  }
+  .hero::before{
+    content:''; position:absolute; inset:0;
+    background-image:linear-gradient(#39ff1408 1px,transparent 1px),linear-gradient(90deg,#39ff1408 1px,transparent 1px);
+    background-size:48px 48px;
+  }
+  .hero::after{
+    content:''; position:absolute; inset:0;
+    background:radial-gradient(ellipse 60% 50% at 50% 60%, #39ff1010 0%, transparent 70%);
+  }
+  .hero-inner{ position:relative; z-index:1; max-width:48rem; margin:0 auto; }
+  .hero h1{
+    font-family:var(--font-display); font-weight:900;
+    font-size:clamp(3rem,10vw,6.5rem); line-height:1; letter-spacing:-.02em;
+    color:#fff; margin:0 0 .5rem;
+  }
+  .hero h1.neon{ color:var(--neon); margin-bottom:1.5rem; }
+  .hero p.lead{ font-size:clamp(1rem,2.5vw,1.3rem); color:#888; line-height:1.6; margin:0 0 .75rem; }
+  .hero p.sub{ font-size:.9rem; color:#555; max-width:480px; margin:0 auto 3rem; }
+  .hero-actions{ margin-top:2rem; display:flex; flex-wrap:wrap; gap:1rem; justify-content:center; }
+  .scroll-hint{
+    position:absolute; bottom:2rem; left:50%; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:.5rem; opacity:.4;
+  }
+  .scroll-hint span{ font-family:var(--font-mono); font-size:.55rem; color:var(--neon); letter-spacing:.3em; }
+  .scroll-hint .line{ width:1px; height:2.5rem; background:linear-gradient(to bottom,var(--neon),transparent); }
+
+  /* ---------- risk factors / flow ---------- */
+  .tag{
+    font-family:var(--font-mono); color:#888; background:#0a0a0a; font-size:.68rem;
+    padding:.4rem 1rem; border-radius:9999px; display:inline-block;
+  }
+  .risk-row{
+    display:flex; align-items:center; gap:.75rem; padding:.75rem 1rem; border-radius:9999px;
+  }
+  .risk-row span.lbl{ font-family:var(--font-body); font-size:.9rem; color:#ccc; }
+  .risk-row .dot{ margin-left:auto; width:8px; height:8px; border-radius:50%; }
+  .flow-arrow{ display:flex; justify-content:center; margin:.4rem 0; }
+  .solution-box{ padding:1.5rem; margin-bottom:2rem; border-radius:24px; background:#050505; }
+  .solution-box p.head{ font-family:var(--font-display); font-weight:800; font-size:1.4rem; color:var(--neon); margin:0 0 .75rem; }
+  .solution-box p.body{ font-size:.9rem; color:#777; line-height:1.7; margin:0; }
+  .pipeline{ display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+  .pipeline .step{ flex:1; text-align:center; padding:.75rem; border-radius:9999px; }
+  .pipeline .step p{ font-family:var(--font-mono); font-size:.58rem; font-weight:700; color:var(--neon); letter-spacing:.08em; margin:0; }
+  .pipeline .arrow{ color:#39ff1066; flex-shrink:0; }
+
+  /* ---------- sensor cards / flow pipeline section 3 ---------- */
+  .sensor-grid{ display:grid; gap:2rem; margin-bottom:5rem; grid-template-columns:1fr; }
+  @media(min-width:768px){ .sensor-grid{ grid-template-columns:repeat(3,1fr); } }
+  .sensor-card{
+    padding:2rem 1.5rem; border-radius:24px; background:transparent;
+    border:1px solid #39ff1420; transition:all .22s ease;
+  }
+  .sensor-card:hover{ background:#39ff140c; border-color:var(--neon); transform:translateY(-4px); box-shadow:0 8px 32px #39ff1422; }
+  .sensor-card .icon-badge{ margin-bottom:1.25rem; }
+  .sensor-card p.title{ font-family:var(--font-mono); font-weight:700; font-size:.75rem; color:var(--neon); letter-spacing:.2em; margin:0 0 .5rem; }
+  .sensor-card p.desc{ font-size:.85rem; color:#666; line-height:1.6; margin:0; }
+
+  .flow-pipeline{ display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:.5rem; }
+  .flow-pipeline .node{ display:flex; align-items:center; gap:.5rem; }
+  .flow-pipeline .node .box{ padding:.5rem 1rem; border-radius:9999px; background:#000; }
+  .flow-pipeline .node .box span{ font-family:var(--font-mono); font-size:.62rem; font-weight:600; letter-spacing:.1em; color:#888; }
+  .flow-pipeline .node .box.active span{ color:var(--neon); }
+  .flow-pipeline .arrow{ color:#39ff1066; font-size:.8rem; }
+  .flow-note{ font-size:.85rem; color:#555; text-align:center; max-width:500px; margin:2rem auto 0; line-height:1.7; }
+
+  .cube-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:1.5rem; margin-top:4rem; max-width:36rem; margin-left:auto; margin-right:auto; }
+  @media(min-width:768px){ .cube-grid{ grid-template-columns:repeat(4,1fr); max-width:none; } }
+  .cube-node{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    width:100%; aspect-ratio:1; border-radius:50%; background:#050505;
+    border:1.5px solid #39ff1444; box-shadow:0 0 10px #39ff1422;
+    transition:all .22s ease; cursor:pointer; padding:1rem;
+  }
+  .cube-node:hover{ background:#39ff1420; border-color:var(--neon); box-shadow:0 0 32px #39ff1466, inset 0 0 20px #39ff1410; transform:scale(1.08); }
+  .cube-node .dot{ width:12px; height:12px; border-radius:50%; background:var(--neon); margin-bottom:.5rem; }
+  .cube-node p.lbl{ font-family:var(--font-mono); font-size:.65rem; color:#888; font-weight:700; text-align:center; margin:0; }
+  .cube-node:hover p.lbl{ color:var(--neon); }
+  .cube-node p.sub{ font-family:var(--font-mono); font-size:.5rem; color:#555; margin:2px 0 0; }
+
+  /* ---------- monitoring / dashboard ---------- */
+  .monitor-grid{ display:grid; gap:3rem; align-items:start; grid-template-columns:1fr; }
+  @media(min-width:768px){ .monitor-grid{ grid-template-columns:1fr 1fr; } }
+  .dashboard{ border-radius:16px; overflow:hidden; background:#050505; max-width:480px; border:1px solid #39ff1444; box-shadow:0 0 12px #39ff1411, inset 0 0 12px #39ff1408; }
+  .dashboard-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.75rem 1rem; border-bottom:1px solid #39ff1420; background:#0a0a0a;
+  }
+  .dashboard-head .brand{ font-size:.85rem; }
+  .dashboard-head .status{ display:flex; align-items:center; gap:.5rem; }
+  .dashboard-head .status .dot{ width:8px; height:8px; border-radius:50%; background:var(--neon); }
+  .dashboard-head .status span{ font-family:var(--font-mono); font-size:.65rem; color:var(--neon); }
+  .dashboard-body{ padding:1rem; }
+  .dashboard-body .block{ margin-bottom:1rem; }
+  .dashboard-body .block-title{ font-family:var(--font-mono); font-size:.6rem; color:#555; letter-spacing:.2em; margin-bottom:.5rem; }
+  .cubo-row{ display:flex; align-items:center; justify-content:space-between; padding:.4rem 0; border-bottom:1px solid #1a1a1a; }
+  .cubo-row span.lbl{ font-family:var(--font-mono); font-size:.7rem; color:#888; }
+  .cubo-row .status-tag{ display:flex; align-items:center; gap:.5rem; }
+  .cubo-row .status-tag .dot{ width:6px; height:6px; border-radius:50%; }
+  .cubo-row .status-tag span{ font-family:var(--font-mono); font-size:.7rem; font-weight:600; }
+  .wave{ display:flex; align-items:flex-end; gap:2px; height:2.5rem; }
+  .wave .bar{ width:3px; min-width:3px; border-radius:9999px; background:var(--neon); }
+  .stat-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:.75rem; }
+  .stat{ text-align:center; padding:.5rem; background:#0d0d0d; border-radius:9999px; border:1px solid #39ff1420; }
+  .stat.warn{ border-color:#ffcc0033; }
+  .stat p.lbl{ font-family:var(--font-mono); font-size:.55rem; color:#555; letter-spacing:.15em; margin:0; }
+  .stat p.val{ font-family:var(--font-display); font-size:1.1rem; font-weight:700; color:var(--neon); margin:0; }
+  .stat.warn p.val{ color:#ffcc00; }
+  .recommend{ padding:.75rem; display:flex; align-items:flex-start; gap:.5rem; background:#ffcc0010; border:1px solid #ffcc0033; border-radius:16px; }
+  .recommend .ico{ color:#ffcc00; font-size:.9rem; }
+  .recommend p.lbl{ font-family:var(--font-mono); font-size:.6rem; color:#ffcc00; font-weight:600; letter-spacing:.1em; margin:0; }
+  .recommend p.txt{ font-family:var(--font-mono); font-size:.65rem; color:#aaa; margin:2px 0 0; }
+
+  .feature-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:.75rem; margin-bottom:1.5rem; }
+  .feature-pill{
+    display:flex; align-items:center; gap:.5rem; padding:.75rem; border-radius:9999px;
+    background:#050505; border:1px solid #39ff1422; transition:all .2s; cursor:default;
+  }
+  .feature-pill:hover{ background:#39ff1410; border-color:var(--neon); transform:scale(1.03); }
+  .feature-pill span.lbl{ font-size:.78rem; color:#aaa; }
+  .feature-pill:hover span.lbl{ color:#ddd; }
+
+  .role-card{
+    padding:1rem; background:#050505; border:1px solid #39ff1420; border-radius:20px;
+    transition:all .2s; margin-bottom:1rem;
+  }
+  .role-card:hover{ background:#39ff1408; border-color:var(--neon); transform:translateX(4px); }
+  .role-card .row{ display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
+  .role-card p.role{ font-family:var(--font-mono); font-size:.65rem; font-weight:700; color:var(--neon); letter-spacing:.15em; margin:0; }
+  .role-card p.desc{ font-family:var(--font-body); font-size:.82rem; color:#666; margin:0; }
+  .quote{ font-family:var(--font-display); font-weight:700; font-size:1.1rem; color:var(--neon); font-style:italic; }
+
+  /* ---------- applications ---------- */
+  .app-grid{ display:grid; gap:1rem; grid-template-columns:1fr; }
+  @media(min-width:768px){ .app-grid{ grid-template-columns:repeat(2,1fr); } }
+  @media(min-width:1024px){ .app-grid{ grid-template-columns:repeat(4,1fr); } }
+  .app-card{
+    border-radius:24px; padding:1.75rem 1.5rem; background:#000;
+    border:1px solid #39ff1422; transition:all .22s ease; cursor:pointer;
+  }
+  .app-card:hover{ background:#39ff140c; border-color:var(--neon); box-shadow:0 0 24px #39ff1433, inset 0 0 16px #39ff1408; transform:scale(1.03); }
+  .app-card p.sector{ font-family:var(--font-mono); font-size:.7rem; font-weight:700; color:var(--neon); letter-spacing:.2em; margin:1rem 0 .75rem; }
+  .app-card li{ display:flex; align-items:center; gap:.5rem; margin-bottom:.4rem; }
+  .app-card li .bullet{ width:4px; height:4px; border-radius:50%; background:#39ff1066; }
+  .app-card li span{ font-size:.8rem; color:#666; }
+  .app-note{ font-size:.85rem; color:#444; text-align:center; margin-top:3rem; }
+
+  /* ---------- final CTA ---------- */
+  .final-cta{ position:relative; padding:8rem 1.5rem; overflow:hidden; text-align:center; background:#000; }
+  .final-cta::before{
+    content:''; position:absolute; inset:0;
+    background-image:linear-gradient(#39ff1406 1px,transparent 1px),linear-gradient(90deg,#39ff1406 1px,transparent 1px);
+    background-size:32px 32px;
+  }
+  .final-cta::after{
+    content:''; position:absolute; inset:0;
+    background:radial-gradient(ellipse 70% 60% at 50% 50%,#39ff1015 0%,transparent 70%);
+  }
+  .final-cta .inner{ position:relative; z-index:1; max-width:36rem; margin:0 auto; }
+  .final-cta .kicker{ font-family:var(--font-mono); font-size:.7rem; color:#555; letter-spacing:.3em; margin-bottom:2rem; }
+  .final-cta h2{ font-family:var(--font-display); font-weight:900; font-size:clamp(3rem,10vw,6rem); color:var(--neon); line-height:1; margin:0 0 1rem; }
+  .final-cta p.tagline{ font-family:var(--font-display); font-weight:300; font-size:clamp(1rem,3vw,1.4rem); color:#888; letter-spacing:.3em; text-transform:uppercase; margin:0 0 3rem; }
+  .final-cta .actions{ display:flex; flex-wrap:wrap; gap:1rem; justify-content:center; }
+
+  /* ---------- footer ---------- */
+  footer{ padding:2rem 1.5rem; border-top:1px solid #39ff1420; }
+  @media(min-width:768px){ footer{ padding:2rem 3rem; } }
+  .footer-inner{
+    max-width:64rem; margin:0 auto; display:flex; flex-direction:column; gap:1rem;
+    align-items:center; justify-content:space-between; text-align:center;
+  }
+  @media(min-width:768px){ .footer-inner{ flex-direction:row; text-align:left; } }
+  .footer-inner .brand{ font-size:.9rem; }
+  .footer-inner p{ font-family:var(--font-mono); font-size:.6rem; color:#333; letter-spacing:.1em; margin:0; }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <span class="brand">LEAK VISION</span>
+  <div class="nav-links">
+    <a href="#problema">Problema</a>
+    <a href="#como-funciona">Como Funciona</a>
+    <a href="#monitoramento">Monitoramento</a>
+    <a href="#aplicacoes">Aplicações</a>
+    <a href="#" class="pill-btn small">Orçamento</a>
+  </div>
+  <div class="nav-toggle" id="navToggle">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path id="navIconPath" d="M3 6h16M3 11h16M3 16h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#problema">Problema</a>
+    <a href="#como-funciona">Como Funciona</a>
+    <a href="#monitoramento">Monitoramento</a>
+    <a href="#aplicacoes">Aplicações</a>
+  </div>
+</nav>
+
+<!-- 01 — HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <p class="eyebrow" style="text-align:center;">SISTEMA DE MONITORAMENTO PREDITIVO</p>
+    <h1>LEAK</h1>
+    <h1 class="neon glow-text">VISION</h1>
+    <p class="lead">Monitore antes que a falha aconteça.</p>
+    <p class="sub">Sistema inteligente de monitoramento preditivo de rolamentos para máquinas agrícolas.</p>
+
+    <svg viewBox="0 0 520 320" style="width:100%; max-width:36rem; margin:0 auto; display:block;" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="150" y="120" width="220" height="110" rx="8" fill="#111" stroke="#39ff1444" stroke-width="1"/>
+      <rect x="230" y="70" width="120" height="80" rx="6" fill="#0d0d0d" stroke="#39ff1444" stroke-width="1"/>
+      <rect x="245" y="80" width="45" height="35" rx="3" fill="#39ff1415" stroke="#39ff1444" stroke-width="0.8"/>
+      <rect x="298" y="80" width="40" height="35" rx="3" fill="#39ff1415" stroke="#39ff1444" stroke-width="0.8"/>
+      <rect x="160" y="130" width="75" height="60" rx="4" fill="#0d0d0d" stroke="#39ff1444" stroke-width="1"/>
+      <rect x="175" y="95" width="10" height="40" rx="3" fill="#1a1a1a" stroke="#39ff1444" stroke-width="0.8"/>
+      <ellipse cx="180" cy="93" rx="7" ry="4" fill="#39ff1420" stroke="#39ff14" stroke-width="0.5"/>
+      <line x1="120" y1="230" x2="200" y2="230" stroke="#39ff1444" stroke-width="1.5" stroke-dasharray="4,4"/>
+      <line x1="330" y1="230" x2="400" y2="230" stroke="#39ff1444" stroke-width="1.5" stroke-dasharray="4,4"/>
+      <circle cx="155" cy="240" r="58" fill="#0a0a0a" stroke="#39ff1444" stroke-width="1.5"/>
+      <circle cx="155" cy="240" r="40" fill="#000" stroke="#39ff1444" stroke-width="1"/>
+      <circle cx="155" cy="240" r="22" fill="#0d0d0d" stroke="#39ff14" stroke-width="1.5"/>
+      <g id="spokes"></g>
+      <circle cx="370" cy="245" r="38" fill="#0a0a0a" stroke="#39ff1444" stroke-width="1.5"/>
+      <circle cx="370" cy="245" r="25" fill="#000" stroke="#39ff1444" stroke-width="1"/>
+      <circle cx="370" cy="245" r="13" fill="#0d0d0d" stroke="#39ff14" stroke-width="1.5"/>
+      <circle cx="155" cy="240" r="5" fill="#39ff14" class="pulse-dot"/>
+      <circle cx="155" cy="185" r="4" fill="#39ff14" class="pulse-dot" style="animation-delay:.5s"/>
+      <circle cx="370" cy="245" r="4" fill="#39ff14" class="pulse-dot" style="animation-delay:1s"/>
+      <circle cx="370" cy="210" r="4" fill="#39ff14" class="pulse-dot" style="animation-delay:1.5s"/>
+      <circle cx="155" cy="240" r="14" fill="none" stroke="#39ff14" stroke-width="0.6" opacity="0.4" class="pulse-dot"/>
+      <circle cx="155" cy="240" r="22" fill="none" stroke="#39ff14" stroke-width="0.4" opacity="0.2" class="pulse-dot" style="animation-delay:.3s"/>
+      <circle cx="370" cy="245" r="10" fill="none" stroke="#39ff14" stroke-width="0.6" opacity="0.4" class="pulse-dot" style="animation-delay:1s"/>
+      <circle cx="370" cy="245" r="17" fill="none" stroke="#39ff14" stroke-width="0.4" opacity="0.2" class="pulse-dot" style="animation-delay:1.3s"/>
+      <line x1="155" y1="240" x2="265" y2="195" stroke="#39ff1066" stroke-width="0.8" stroke-dasharray="5,3"/>
+      <line x1="155" y1="185" x2="265" y2="195" stroke="#39ff1066" stroke-width="0.8" stroke-dasharray="5,3"/>
+      <line x1="370" y1="245" x2="265" y2="195" stroke="#39ff1066" stroke-width="0.8" stroke-dasharray="5,3"/>
+      <line x1="370" y1="210" x2="265" y2="195" stroke="#39ff1066" stroke-width="0.8" stroke-dasharray="5,3"/>
+      <rect x="230" y="180" width="70" height="28" rx="14" fill="#000" stroke="#39ff14" stroke-width="1"/>
+      <text x="265" y="198" text-anchor="middle" fill="#39ff14" font-size="9" font-family="JetBrains Mono" font-weight="700" letter-spacing="1">LEAK VISION</text>
+      <line x1="80" y1="295" x2="440" y2="295" stroke="#39ff1420" stroke-width="1"/>
+    </svg>
+
+    <div class="hero-actions">
+      <a href="#problema" class="pill-btn">EXPLORAR O SISTEMA</a>
+      <a href="#" class="pill-btn outline">SOLICITAR ORÇAMENTO</a>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <span>SCROLL</span>
+    <div class="line"></div>
+  </div>
+</section>
+
+<!-- 02 — PROBLEMA + SOLUÇÃO -->
+<section id="problema">
+  <div class="wrap">
+    <p class="eyebrow">02 — PROBLEMA E SOLUÇÃO</p>
+    <h2 class="title">Uma falha começa<br><span class="accent">antes da máquina parar.</span></h2>
+    <div class="monitor-grid">
+      <div>
+        <p class="eyebrow" style="color:#555; letter-spacing:.25em; font-size:.6rem;">FATORES DE RISCO</p>
+        <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:2rem;">
+          <span class="tag neon-border">Lubrificação</span>
+          <span class="tag neon-border">Contaminação</span>
+          <span class="tag neon-border">Sobrecarga</span>
+          <span class="tag neon-border">Temperatura</span>
+          <span class="tag neon-border">Desgaste</span>
+        </div>
+        <div>
+          <div>
+            <div class="risk-row" style="background:#39ff1408; border:1px solid #39ff1422;">
+              <span class="icon" style="color:#39ff14;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 6 12 8 5 12 19 14 12 16 16 18 12 22 12"/></svg></span><span class="lbl">Alteração de Vibração</span>
+              <div class="dot" style="background:#39ff14; box-shadow:0 0 6px #39ff14;"></div>
+            </div>
+            <div class="flow-arrow"><svg width="20" height="24" viewBox="0 0 20 24" fill="none"><path d="M10 0v18M3 12l7 10 7-10" stroke="#39ff14" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div>
+            <div class="risk-row" style="background:#39ff1408; border:1px solid #39ff1422;">
+              <span class="icon" style="color:#39ff14;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0z"/></svg></span><span class="lbl">Temperatura Anormal</span>
+              <div class="dot" style="background:#39ff14; box-shadow:0 0 6px #39ff14;"></div>
+            </div>
+            <div class="flow-arrow"><svg width="20" height="24" viewBox="0 0 20 24" fill="none"><path d="M10 0v18M3 12l7 10 7-10" stroke="#39ff14" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div>
+            <div class="risk-row" style="background:#ffcc0008; border:1px solid #ffcc0022;">
+              <span class="icon" style="color:#ffcc00;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><span class="lbl">Possível Anomalia</span>
+              <div class="dot" style="background:#ffcc00; box-shadow:0 0 6px #ffcc00;"></div>
+            </div>
+            <div class="flow-arrow"><svg width="20" height="24" viewBox="0 0 20 24" fill="none"><path d="M10 0v18M3 12l7 10 7-10" stroke="#39ff14" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div>
+            <div class="risk-row" style="background:#ff664408; border:1px solid #ff664422;">
+              <span class="icon" style="color:#ff6644;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span><span class="lbl">Falha Detectada</span>
+              <div class="dot" style="background:#ff6644; box-shadow:0 0 6px #ff6644;"></div>
+            </div>
+            <div class="flow-arrow"><svg width="20" height="24" viewBox="0 0 20 24" fill="none"><path d="M10 0v18M3 12l7 10 7-10" stroke="#39ff14" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div>
+            <div class="risk-row" style="background:#ff333308; border:1px solid #ff333322;">
+              <span class="icon" style="color:#ff3333;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg></span><span class="lbl">Parada da Máquina</span>
+              <div class="dot" style="background:#ff3333; box-shadow:0 0 6px #ff3333;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="eyebrow" style="color:#555; letter-spacing:.25em; font-size:.6rem;">A SOLUÇÃO</p>
+        <div class="solution-box neon-border">
+          <p class="head">O Leak Vision monitora esses sinais.</p>
+          <p class="body">O sistema acompanha continuamente as condições dos rolamentos e analisa os dados para identificar alterações antes que evoluam para falhas graves.</p>
+        </div>
+        <div class="pipeline">
+          <div class="step neon-border"><p>MONITORAR</p></div>
+          <span class="arrow">→</span>
+          <div class="step neon-border"><p>ANALISAR</p></div>
+          <span class="arrow">→</span>
+          <div class="step neon-border"><p>ALERTAR</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 — COMO FUNCIONA -->
+<section id="como-funciona" class="section-alt">
+  <div class="wrap">
+    <p class="eyebrow">03 — COMO FUNCIONA</p>
+    <h2 class="title">Como o Leak Vision<br><span class="accent">funciona?</span></h2>
+
+    <div class="sensor-grid">
+      <div class="sensor-card">
+        <div class="icon-badge lg" style="color:#39ff14;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 6 12 8 5 12 19 14 12 16 16 18 12 22 12"/></svg></div>
+        <p class="title">VIBRAÇÃO</p>
+        <p class="desc">Identifica alterações no comportamento mecânico do rolamento.</p>
+      </div>
+      <div class="sensor-card">
+        <div class="icon-badge lg" style="color:#39ff14;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0z"/></svg></div>
+        <p class="title">TEMPERATURA</p>
+        <p class="desc">Complementa a análise e ajuda a identificar aquecimentos anormais.</p>
+      </div>
+      <div class="sensor-card">
+        <div class="icon-badge lg" style="color:#39ff14;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></div>
+        <p class="title">ROTAÇÃO</p>
+        <p class="desc">Determina o comportamento do eixo e auxilia na interpretação dos sinais.</p>
+      </div>
+    </div>
+
+    <div class="flow-pipeline">
+      <div class="node"><div class="box"><span>SENSORES</span></div></div>
+      <span class="arrow">→</span>
+      <div class="node"><div class="box"><span>COLETA</span></div></div>
+      <span class="arrow">→</span>
+      <div class="node"><div class="box"><span>PROCESSAMENTO</span></div></div>
+      <span class="arrow">→</span>
+      <div class="node"><div class="box"><span>ANÁLISE</span></div></div>
+      <span class="arrow">→</span>
+      <div class="node"><div class="box"><span>DIAGNÓSTICO</span></div></div>
+      <span class="arrow">→</span>
+      <div class="node"><div class="box active"><span>ALERTA</span></div></div>
+    </div>
+
+    <p class="flow-note">Dados coletados pelos sensores são processados e transformados em informações que ajudam na tomada de decisões de manutenção.</p>
+
+    <div class="cube-grid">
+      <div class="cube-node"><div class="dot pulse-dot"></div><p class="lbl">CUBO 01</p><p class="sub">MONITORADO</p></div>
+      <div class="cube-node"><div class="dot pulse-dot" style="animation-delay:.5s"></div><p class="lbl">CUBO 02</p><p class="sub">MONITORADO</p></div>
+      <div class="cube-node"><div class="dot pulse-dot" style="animation-delay:1s"></div><p class="lbl">CUBO 03</p><p class="sub">MONITORADO</p></div>
+      <div class="cube-node"><div class="dot pulse-dot" style="animation-delay:1.5s"></div><p class="lbl">CUBO 04</p><p class="sub">MONITORADO</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 — MONITORAMENTO -->
+<section id="monitoramento">
+  <div class="wrap">
+    <p class="eyebrow">04 — MONITORAMENTO</p>
+    <h2 class="title">Dados que viram<br><span class="accent">informação.</span></h2>
+
+    <div class="monitor-grid">
+      <div class="dashboard">
+        <div class="dashboard-head">
+          <span class="brand">LEAK VISION</span>
+          <div class="status"><div class="dot pulse-dot"></div><span>ONLINE</span></div>
+        </div>
+        <div class="dashboard-body">
+          <div class="block">
+            <p class="block-title">STATUS DOS ROLAMENTOS</p>
+            <div class="cubo-row"><span class="lbl">CUBO 01</span><div class="status-tag"><div class="dot" style="background:#39ff14; box-shadow:0 0 6px #39ff14;"></div><span style="color:#39ff14;">NORMAL</span></div></div>
+            <div class="cubo-row"><span class="lbl">CUBO 02</span><div class="status-tag"><div class="dot" style="background:#39ff14; box-shadow:0 0 6px #39ff14;"></div><span style="color:#39ff14;">NORMAL</span></div></div>
+            <div class="cubo-row"><span class="lbl">CUBO 03</span><div class="status-tag"><div class="dot" style="background:#ffcc00; box-shadow:0 0 6px #ffcc00;"></div><span style="color:#ffcc00;">ATENÇÃO</span></div></div>
+            <div class="cubo-row"><span class="lbl">CUBO 04</span><div class="status-tag"><div class="dot" style="background:#39ff14; box-shadow:0 0 6px #39ff14;"></div><span style="color:#39ff14;">NORMAL</span></div></div>
+          </div>
+          <div class="block">
+            <p class="block-title">VIBRAÇÃO — CUBO 03</p>
+            <div class="wave" id="waveform"></div>
+          </div>
+          <div class="stat-grid" style="margin-bottom:1rem;">
+            <div class="stat warn"><p class="lbl">TEMP</p><p class="val">62°C</p></div>
+            <div class="stat"><p class="lbl">RPM</p><p class="val">1.850</p></div>
+            <div class="stat warn"><p class="lbl">G-RMS</p><p class="val">4.2</p></div>
+          </div>
+          <div class="recommend">
+            <span class="ico icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+            <div><p class="lbl">RECOMENDAÇÃO</p><p class="txt">Verificar Cubo 03 — elevação de vibração detectada.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="feature-grid">
+          <div class="feature-pill"><span class="icon" style="color:#39ff14;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></span><span class="lbl">Dados em tempo real</span></div>
+          <div class="feature-pill"><span class="icon" style="color:#39ff14;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span><span class="lbl">Alertas inteligentes</span></div>
+          <div class="feature-pill"><span class="icon" style="color:#39ff14;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span><span class="lbl">Histórico completo</span></div>
+          <div class="feature-pill"><span class="icon" style="color:#39ff14;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span><span class="lbl">Análise de vibração</span></div>
+          <div class="feature-pill"><span class="icon" style="color:#39ff14;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></span><span class="lbl">Diagnóstico</span></div>
+        </div>
+        <div style="border-top:1px solid #1a1a1a; padding-top:1.5rem;">
+          <div class="role-card">
+            <div class="row"><span class="icon" style="color:#39ff14;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><p class="role">PARA O OPERADOR</p></div>
+            <p class="desc">Informações simples e objetivas: NORMAL, ATENÇÃO, CRÍTICO com alertas e recomendações.</p>
+          </div>
+          <div class="role-card">
+            <div class="row"><span class="icon" style="color:#39ff14;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span><p class="role">PARA MANUTENÇÃO</p></div>
+            <p class="desc">Vibração, temperatura, RPM, histórico, espectro e dados completos dos sensores.</p>
+          </div>
+        </div>
+        <p class="quote">"Informação simples para quem opera. Dados completos para quem mantém."</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 — APLICAÇÕES -->
+<section id="aplicacoes" class="section-alt">
+  <div class="wrap">
+    <p class="eyebrow">05 — ADAPTABILIDADE</p>
+    <h2 class="title tight">Desenvolvido para o campo.</h2>
+    <p style="font-size:1rem; color:#555; margin-bottom:3rem;">Adaptável a diferentes aplicações.</p>
+
+    <div class="app-grid">
+      <div class="app-card">
+        <div class="icon-badge md" style="color:#39ff14;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg></div>
+        <p class="sector">AGRICULTURA</p>
+        <ul>
+          <li><div class="bullet"></div><span>Tratores</span></li>
+          <li><div class="bullet"></div><span>Colheitadeiras</span></li>
+          <li><div class="bullet"></div><span>Pulverizadores</span></li>
+          <li><div class="bullet"></div><span>Plantadeiras</span></li>
+        </ul>
+      </div>
+      <div class="app-card">
+        <div class="icon-badge md" style="color:#39ff14;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a1 1 0 0 0-1.6-.8L2 8Z"/><path d="M17 18h.01"/><path d="M12 18h.01"/><path d="M7 18h.01"/></svg></div>
+        <p class="sector">INDÚSTRIA</p>
+        <ul>
+          <li><div class="bullet"></div><span>Motores</span></li>
+          <li><div class="bullet"></div><span>Bombas</span></li>
+          <li><div class="bullet"></div><span>Máquinas rotativas</span></li>
+        </ul>
+      </div>
+      <div class="app-card">
+        <div class="icon-badge md" style="color:#39ff14;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="16" rx="2"/><path d="M4 11h16"/><path d="M12 3v8"/><path d="m8 19-2 3"/><path d="m18 22-2-3"/><path d="M8 15h.01"/><path d="M16 15h.01"/></svg></div>
+        <p class="sector">FERROVIÁRIO</p>
+        <ul>
+          <li><div class="bullet"></div><span>Componentes rotativos</span></li>
+          <li><div class="bullet"></div><span>Sistemas de transporte</span></li>
+        </ul>
+      </div>
+      <div class="app-card">
+        <div class="icon-badge md" style="color:#39ff14;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg></div>
+        <p class="sector">MINERAÇÃO</p>
+        <ul>
+          <li><div class="bullet"></div><span>Equipamentos em condições severas</span></li>
+        </ul>
+      </div>
+    </div>
+    <p class="app-note">A arquitetura do Leak Vision pode ser adaptada conforme o equipamento e a necessidade de monitoramento.</p>
+  </div>
+</section>
+
+<!-- 07 — FINAL -->
+<section class="final-cta">
+  <div class="inner">
+    <p class="kicker">Antes da falha, existe um sinal.</p>
+    <h2 class="glow-text">LEAK VISION</h2>
+    <p class="tagline">Monitore. Antecipe. Previna.</p>
+    <div class="actions">
+      <a href="#" class="pill-btn">SOLICITAR ORÇAMENTO</a>
+      <a href="#problema" class="pill-btn outline">CONHECER O SISTEMA</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <span class="brand">LEAK VISION</span>
+    <p>© 2025 LEAK VISION — MONITORAMENTO PREDITIVO DE ROLAMENTOS</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  // ---- mobile nav toggle ----
+  var toggle = document.getElementById('navToggle');
+  var menu = document.getElementById('mobileMenu');
+  var iconPath = document.getElementById('navIconPath');
+  var open = false;
+  toggle.addEventListener('click', function(){
+    open = !open;
+    menu.classList.toggle('open', open);
+    iconPath.setAttribute('d', open ? 'M4 4L18 18M18 4L4 18' : 'M3 6h16M3 11h16M3 16h16');
+  });
+  menu.querySelectorAll('a').forEach(function(a){
+    a.addEventListener('click', function(){
+      open = false;
+      menu.classList.remove('open');
+      iconPath.setAttribute('d', 'M3 6h16M3 11h16M3 16h16');
+    });
+  });
+
+  // ---- hero tractor wheel spokes ----
+  var spokesGroup = document.getElementById('spokes');
+  var angles = [0,45,90,135,180,225,270,315];
+  angles.forEach(function(a){
+    var rad = a * Math.PI / 180;
+    var x1 = 155 + 22*Math.cos(rad), y1 = 240 + 22*Math.sin(rad);
+    var x2 = 155 + 38*Math.cos(rad), y2 = 240 + 38*Math.sin(rad);
+    var line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+    line.setAttribute('stroke', '#39ff1066'); line.setAttribute('stroke-width', '1');
+    spokesGroup.appendChild(line);
+  });
+
+  // ---- dashboard waveform bars ----
+  var waveform = document.getElementById('waveform');
+  var heights = [12,18,8,22,14,26,10,20,16,24,9,18,13,21,11,19,15,23,8,17];
+  heights.forEach(function(h, i){
+    var bar = document.createElement('div');
+    bar.className = 'bar bar-animate';
+    bar.style.height = h + 'px';
+    bar.style.animationDelay = (i * 0.06) + 's';
+    waveform.appendChild(bar);
+  });
+})();
+</script>
+
+</body>
+</html>
